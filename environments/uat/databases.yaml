@@ -1,0 +1,27 @@
+database:
+  namespace: uat-db
+
+mysql:
+  enabled: true
+  database: uatdb
+  user: uatuser
+  pvc:
+    name: mysql-pvc
+    size: 8Gi
+  service:
+    type: NodePort
+    port: 3306
+    nodePort: 30308
+
+mongodb:
+  enabled: true
+  rootUser: root
+  username: uatuser
+  database: uatdb
+  pvc:
+    name: mongo-pvc
+    size: 10Gi
+  service:
+    type: NodePort
+    port: 27017
+    nodePort: 30019

@@ -1,0 +1,21 @@
+# Kubernetes
+*.secret.yaml
+environments/*/databases.secret.yaml
+secrets/
+*.key
+*.pem
+
+# Helm
+helm/*/charts/
+helm/*/Chart.lock
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Temporary files
+*.tmp
+*.log

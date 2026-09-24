@@ -1,0 +1,194 @@
+{{- if .Values.mongodb.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+  namespace: {{ .Values.database.namespace }}
+type: Opaque
+stringData:
+  MONGO_INITDB_ROOT_USERNAME: {{ .Values.mongodb.rootUser | quote }}
+  MONGO_INITDB_ROOT_PASSWORD: {{ required "mongodb.rootPassword is required; provide a local secret values file" .Values.mongodb.rootPassword | quote }}
+  MONGO_INITDB_DATABASE: {{ .Values.mongodb.database | quote }}
+  MONGO_USERNAME: {{ .Values.mongodb.username | quote }}
+  MONGO_PASSWORD: {{ required "mongodb.password is required; provide a local secret values file" .Values.mongodb.password | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-init-script
+  namespace: {{ .Values.database.namespace }}
+data:
+  init-mongo.sh: |
+    #!/bin/bash
+    set -e
+
+    if [ -f /data/db/.mongo-app-user-created ]; then
+      exit 0
+    fi
+
+    mongosh --quiet --host localhost --port 27017 \\
+      -u "${MONGO_INITDB_ROOT_USERNAME}" \\
+      -p "${MONGO_INITDB_ROOT_PASSWORD}" \\
+      --authenticationDatabase admin <<'EOF'
+    const appUser = process.env.MONGO_USERNAME;
+    const appPassword = process.env.MONGO_PASSWORD;
+    const appDb = process.env.MONGO_INITDB_DATABASE;
+    const targetDb = db.getSiblingDB(appDb);
+
+    const userExists = targetDb.getUser(appUser);
+    if (!userExists) {
+      targetDb.createUser({
+        user: appUser,
+        pwd: appPassword,
+        roles: [
+          { role: "readWrite", db: appDb }
+        ]
+      });
+    }
+    EOF
+
+    touch /data/db/.mongo-app-user-created
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.mongodb.pvc.name }}
+  namespace: {{ .Values.database.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.mongodb.pvc.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: {{ .Values.database.namespace }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
+          ports:
+            - containerPort: 27017
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    if [ -f /data/db/.mongo-app-user-created ]; then
+                      exit 0
+                    fi
+
+                    for i in $(seq 1 30); do
+                      if mongosh --quiet --host localhost --port 27017 \
+                        -u "${MONGO_INITDB_ROOT_USERNAME}" \
+                        -p "${MONGO_INITDB_ROOT_PASSWORD}" \
+                        --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" >/dev/null 2>&1; then
+                        break
+                      fi
+                      sleep 2
+                    done
+
+                    mongosh --quiet --host localhost --port 27017 \
+                      -u "${MONGO_INITDB_ROOT_USERNAME}" \
+                      -p "${MONGO_INITDB_ROOT_PASSWORD}" \
+                      --authenticationDatabase admin <<'EOF'
+                    const appUser = process.env.MONGO_USERNAME;
+                    const appPassword = process.env.MONGO_PASSWORD;
+                    const appDb = process.env.MONGO_INITDB_DATABASE;
+                    const targetDb = db.getSiblingDB(appDb);
+
+                    const userExists = targetDb.getUser(appUser);
+                    if (!userExists) {
+                      targetDb.createUser({
+                        user: appUser,
+                        pwd: appPassword,
+                        roles: [
+                          { role: "readWrite", db: appDb }
+                        ]
+                      });
+                    }
+                    EOF
+
+                    touch /data/db/.mongo-app-user-created
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_INITDB_ROOT_PASSWORD
+            - name: MONGO_INITDB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_INITDB_DATABASE
+            - name: MONGO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_USERNAME
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_PASSWORD
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+            - name: mongo-init-script
+              mountPath: /docker-entrypoint-initdb.d/init-mongo.sh
+              subPath: init-mongo.sh
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+      volumes:
+        - name: mongo-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.mongodb.pvc.name }}
+        - name: mongo-init-script
+          configMap:
+            name: mongo-init-script
+            defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: {{ .Values.database.namespace }}
+spec:
+  selector:
+    app: mongodb
+  type: {{ .Values.mongodb.service.type }}
+  ports:
+    - port: {{ .Values.mongodb.service.port }}
+      targetPort: 27017
+      protocol: TCP
+      name: mongodb
+      {{- if eq .Values.mongodb.service.type "NodePort" }}
+      nodePort: {{ .Values.mongodb.service.nodePort }}
+      {{- end }}
+{{- end }}

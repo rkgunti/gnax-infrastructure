@@ -1,0 +1,33 @@
+database:
+  namespace: platform-db
+
+mysql:
+  enabled: true
+  image:
+    repository: mysql
+    tag: "8.4"
+  database: appdb
+  user: appuser
+  pvc:
+    name: mysql-pvc
+    size: 8Gi
+  service:
+    type: NodePort
+    port: 3306
+    nodePort: 30306
+
+mongodb:
+  enabled: true
+  image:
+    repository: mongo
+    tag: "8"
+  rootUser: root
+  username: appuser
+  database: appdb
+  pvc:
+    name: mongo-pvc
+    size: 10Gi
+  service:
+    type: NodePort
+    port: 27017
+    nodePort: 30017

@@ -1,0 +1,27 @@
+database:
+  namespace: test-db
+
+mysql:
+  enabled: true
+  database: testdb
+  user: testuser
+  pvc:
+    name: mysql-pvc
+    size: 8Gi
+  service:
+    type: NodePort
+    port: 3306
+    nodePort: 30307
+
+mongodb:
+  enabled: true
+  rootUser: root
+  username: testuser
+  database: testdb
+  pvc:
+    name: mongo-pvc
+    size: 10Gi
+  service:
+    type: NodePort
+    port: 27017
+    nodePort: 30018
