@@ -1,5 +1,5 @@
 database:
-  namespace: dev-platform
+  namespace: dev-infra
 
 kafka:
   enabled: true

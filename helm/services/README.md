@@ -14,4 +14,4 @@ Environment namespaces:
 - `test`
 - `uat`
 
-Platform namespaces are separate: `dev-platform`, `test-platform`, and `uat-platform`.
+Infrastructure namespaces are separate: `dev-infra`, `test-infra`, and `uat-infra`.

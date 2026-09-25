@@ -1,5 +1,5 @@
 database:
-  namespace: uat-platform
+  namespace: uat-infra
 
 mongodb:
   enabled: true

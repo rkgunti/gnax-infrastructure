@@ -1,6 +1,6 @@
 # gnax-infrastructure
-Infrastructure and deployment configurations for the GnaX platform including Kubernetes, Helm, Kafka, databases, Redis, networking, and environment configurations.
-Local Kubernetes platform running on Rancher Desktop with independent database and service releases.
+Infrastructure and deployment configurations for GnaX, including Kubernetes, Helm, Kafka, databases, Redis, networking, and environment configurations.
+Local Kubernetes infrastructure running on Rancher Desktop with independent database and service releases.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ The selected context must point to the Rancher Desktop Kubernetes cluster.
 
 ```text
 helm/
-	platforms/
+	infra/
 		mysql/
 		mongodb/
 		kafka/
@@ -55,16 +55,16 @@ namespaces/
 	dev.yaml
 	test.yaml
 	uat.yaml
-	dev-platform.yaml
-	test-platform.yaml
-	uat-platform.yaml
+	dev-infra.yaml
+	test-infra.yaml
+	uat-infra.yaml
 ```
 
 Use generic service names such as `orders`, `catalog`, or `notifications`. Do not use architectural names such as `frontend` or `backend`.
 
 ## Namespace Model
 
-Application services use `dev`, `test`, and `uat`. Platform components use `dev-platform`, `test-platform`, and `uat-platform`. One environment can contain many services while its platform components remain isolated in the matching platform namespace.
+Application services use `dev`, `test`, and `uat`. Infrastructure components use `dev-infra`, `test-infra`, and `uat-infra`. One environment can contain many services while its infrastructure components remain isolated in the matching infrastructure namespace.
 
 ## Step 1: Create Namespaces
 
@@ -90,31 +90,31 @@ cp environments/uat/mongodb.secret.yaml.example environments/uat/mongodb.secret.
 
 Open each new `mysql.secret.yaml` and `mongodb.secret.yaml` file and replace every `CHANGE_ME_*` value with a local password. Never commit these files. They are ignored by `.gitignore`.
 
-## Step 3: Validate the Platform Charts
+## Step 3: Validate the Infrastructure Charts
 
 Lint each independent chart:
 
 ```bash
-helm lint ./helm/platforms/mysql
-helm lint ./helm/platforms/mongodb
-helm lint ./helm/platforms/kafka
+helm lint ./helm/infra/mysql
+helm lint ./helm/infra/mongodb
+helm lint ./helm/infra/kafka
 ```
 
 Render each chart independently. MySQL and MongoDB require their matching secret file:
 
 ```bash
-helm template mysql ./helm/platforms/mysql \
-	--namespace dev-platform \
+helm template mysql ./helm/infra/mysql \
+	--namespace dev-infra \
 	--values ./environments/dev/mysql.yaml \
 	--values ./environments/dev/mysql.secret.yaml
 
-helm template mongodb ./helm/platforms/mongodb \
-	--namespace dev-platform \
+helm template mongodb ./helm/infra/mongodb \
+	--namespace dev-infra \
 	--values ./environments/dev/mongodb.yaml \
 	--values ./environments/dev/mongodb.secret.yaml
 
-helm template kafka ./helm/platforms/kafka \
-	--namespace dev-platform \
+helm template kafka ./helm/infra/kafka \
+	--namespace dev-infra \
 	--values ./environments/dev/kafka.yaml
 ```
 
@@ -123,8 +123,8 @@ helm template kafka ./helm/platforms/kafka \
 Deploy or update MySQL:
 
 ```bash
-helm upgrade --install mysql ./helm/platforms/mysql \
-	--namespace dev-platform \
+helm upgrade --install mysql ./helm/infra/mysql \
+	--namespace dev-infra \
 	--create-namespace \
 	--values ./environments/dev/mysql.yaml \
 	--values ./environments/dev/mysql.secret.yaml
@@ -133,8 +133,8 @@ helm upgrade --install mysql ./helm/platforms/mysql \
 Deploy or update MongoDB:
 
 ```bash
-helm upgrade --install mongodb ./helm/platforms/mongodb \
-	--namespace dev-platform \
+helm upgrade --install mongodb ./helm/infra/mongodb \
+	--namespace dev-infra \
 	--create-namespace \
 	--values ./environments/dev/mongodb.yaml \
 	--values ./environments/dev/mongodb.secret.yaml
@@ -143,8 +143,8 @@ helm upgrade --install mongodb ./helm/platforms/mongodb \
 Deploy or update Kafka:
 
 ```bash
-helm upgrade --install kafka ./helm/platforms/kafka \
-	--namespace dev-platform \
+helm upgrade --install kafka ./helm/infra/kafka \
+	--namespace dev-infra \
 	--create-namespace \
 	--values ./environments/dev/kafka.yaml
 ```
@@ -152,11 +152,11 @@ helm upgrade --install kafka ./helm/platforms/kafka \
 Use the matching `test` or `uat` values files and namespaces for those environments. Check the independent releases and workloads:
 
 ```bash
-helm list -n dev-platform
-kubectl get pods,svc,pvc -n dev-platform
+helm list -n dev-infra
+kubectl get pods,svc,pvc -n dev-infra
 ```
 
-Kafka uses `kafka.dev-platform.svc.cluster.local:9092` inside Kubernetes and `127.0.0.1:30094` from host-side tools.
+Kafka uses `kafka.dev-infra.svc.cluster.local:9092` inside Kubernetes and `127.0.0.1:30094` from host-side tools.
 
 ## Step 6: Add a Service
 
@@ -193,12 +193,12 @@ Use `test` or `uat` and the matching environment values for those deployments.
 Services inside the cluster use Kubernetes DNS:
 
 ```text
-mongodb.dev-platform.svc.cluster.local:27017
-mysql.dev-platform.svc.cluster.local:3306
-kafka.dev-platform.svc.cluster.local:9092
+mongodb.dev-infra.svc.cluster.local:27017
+mysql.dev-infra.svc.cluster.local:3306
+kafka.dev-infra.svc.cluster.local:9092
 ```
 
-Replace `dev-platform` with `test-platform` or `uat-platform` for the other environments.
+Replace `dev-infra` with `test-infra` or `uat-infra` for the other environments.
 
 Host-side tools use these NodePorts:
 
@@ -209,7 +209,7 @@ test         30018      30307      30094
 uat          30019      30308      30094
 ```
 
-Kafka clients inside the cluster use `kafka.<env>-platform.svc.cluster.local:9092`. Host-side tools use `127.0.0.1:30094`.
+Kafka clients inside the cluster use `kafka.<env>-infra.svc.cluster.local:9092`. Host-side tools use `127.0.0.1:30094`.
 
 Example local MongoDB connection:
 
@@ -222,13 +222,13 @@ mongodb://<user>:<password>@127.0.0.1:30017/<database>
 ```bash
 kubectl get pods -A
 kubectl describe pod <pod-name> -n <namespace>
-kubectl logs deployment/mongodb -n dev-platform
-kubectl logs deployment/mysql -n dev-platform
-kubectl logs deployment/kafka -n dev-platform
-kubectl get endpoints -n dev-platform
-helm get manifest mysql -n dev-platform
-helm get manifest mongodb -n dev-platform
-helm get manifest kafka -n dev-platform
+kubectl logs deployment/mongodb -n dev-infra
+kubectl logs deployment/mysql -n dev-infra
+kubectl logs deployment/kafka -n dev-infra
+kubectl get endpoints -n dev-infra
+helm get manifest mysql -n dev-infra
+helm get manifest mongodb -n dev-infra
+helm get manifest kafka -n dev-infra
 ```
 
 Database PVCs are namespace-scoped. Do not move a database to another namespace without a backup and restore plan. For disposable local data, uninstall the old release and install the new one only when data loss is acceptable.

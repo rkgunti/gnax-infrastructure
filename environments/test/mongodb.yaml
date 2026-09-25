@@ -1,5 +1,5 @@
 database:
-  namespace: test-platform
+  namespace: test-infra
 
 mongodb:
   enabled: true
