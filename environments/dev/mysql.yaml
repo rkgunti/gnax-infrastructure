@@ -1,0 +1,14 @@
+database:
+  namespace: dev-platform
+
+mysql:
+  enabled: true
+  database: devdb
+  user: devuser
+  pvc:
+    name: mysql-pvc
+    size: 8Gi
+  service:
+    type: NodePort
+    port: 3306
+    nodePort: 30306

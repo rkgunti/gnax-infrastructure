@@ -1,0 +1,14 @@
+kafka:
+  enabled: true
+  image:
+    repository: apache/kafka
+    tag: "4.0.0"
+  pvc:
+    name: kafka-pvc
+    size: 8Gi
+  service:
+    type: NodePort
+    internalPort: 9092
+    externalPort: 9094
+    controllerPort: 9093
+    nodePort: 30094

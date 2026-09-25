@@ -1,0 +1,14 @@
+database:
+  namespace: uat-platform
+
+kafka:
+  enabled: true
+  pvc:
+    name: kafka-pvc
+    size: 8Gi
+  service:
+    type: NodePort
+    internalPort: 9092
+    externalPort: 9094
+    controllerPort: 9093
+    nodePort: 30094

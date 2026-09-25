@@ -9,25 +9,25 @@ applyTo: "**"
 
 - This repository targets one local Rancher Desktop Kubernetes cluster with three application environments: `dev`, `test`, and `uat`.
 - Application services belong in the matching environment namespace: `dev`, `test`, or `uat`.
-- Databases belong in dedicated namespaces: `dev-db`, `test-db`, and `uat-db`.
+- Platform components belong in dedicated namespaces: `dev-platform`, `test-platform`, and `uat-platform`.
 - Use generic service names such as `orders`, `catalog`, or `notifications`. Do not introduce `frontend` or `backend` as architectural names.
 - Deploy each database or application service as an independent Helm release so changing one service does not redeploy unrelated services.
 
 ## Repository structure
 
-- Keep database chart defaults and metadata under `helm/databases/`.
+- Keep platform component chart defaults and metadata under `helm/platforms/`.
 - Keep application service charts under `helm/services/<service-name>/`.
 - Keep database overrides in `environments/<env>/databases.yaml`.
 - Keep each service's overrides in `environments/<env>/<service-name>.yaml`.
 - Keep namespace definitions under `namespaces/` and keep them aligned with the namespace values in the database and service charts.
 - Preserve the separation between chart defaults and environment-specific values; do not copy environment credentials into chart defaults.
-- Keep database templates out of `helm/services/`.
+- Keep platform component templates out of `helm/services/`.
 
 ## Helm and values conventions
 
 - Prefer chart-level defaults in each chart's `values.yaml` and environment overrides in the matching environment file.
 - Use `helm upgrade --install` with a stable release name for repeatable local deployments.
-- Use `databases` as the release name for new database installations.
+- Use the component name (`mysql`, `mongodb`, or `kafka`) as the release name for platform installations.
 - Use the service name as the release name for application services.
 - Use consistent names across chart names, release names, Kubernetes Services, and namespace references.
 - Keep values structures easy to override without deep duplication.
@@ -48,11 +48,11 @@ applyTo: "**"
 
 1. Confirm Rancher Desktop Kubernetes is running and the selected context points to the local cluster.
 2. Create or reconcile all application and database namespaces with `kubectl apply -f namespaces/`.
-3. Validate the database chart with `helm lint ./helm/databases` and `helm template` using the target environment's `databases.yaml`.
-4. Install or upgrade the database release in the matching `*-db` namespace.
+3. Validate each platform chart with `helm lint ./helm/platforms/<component>` and `helm template` using the target environment's component values.
+4. Install or upgrade each platform component independently in the matching `*-db` namespace.
 5. Wait for database pods and verify their Services, PVCs, credentials, and NodePorts.
 6. Deploy each application service separately into `dev`, `test`, or `uat` with that service's environment values.
-7. Use Kubernetes DNS from services, for example `mongodb.dev-db.svc.cluster.local` and `mysql.dev-db.svc.cluster.local`.
+7. Use Kubernetes DNS from services, for example `mongodb.dev-platform.svc.cluster.local` and `mysql.dev-platform.svc.cluster.local`.
 8. Use the documented NodePorts only for host-side development tools.
 
 ## Validation expectations

@@ -1,0 +1,15 @@
+mongodb:
+  enabled: true
+  image:
+    repository: mongo
+    tag: "8"
+  rootUser: root
+  username: appuser
+  database: appdb
+  pvc:
+    name: mongo-pvc
+    size: 10Gi
+  service:
+    type: NodePort
+    port: 27017
+    nodePort: 30017

@@ -21,43 +21,50 @@ The selected context must point to the Rancher Desktop Kubernetes cluster.
 
 ```text
 helm/
-	databases/
-		Chart.yaml
-		values.yaml
-		templates/
-			mysql.yaml
-			mongodb.yaml
+	platforms/
+		mysql/
+		mongodb/
+		kafka/
 	services/
 		<service-name>/
 
 environments/
 	dev/
-		databases.yaml
-		databases.secret.yaml.example
+		mysql.yaml
+		mysql.secret.yaml.example
+		mongodb.yaml
+		mongodb.secret.yaml.example
+		kafka.yaml
 		<service-name>.yaml
 	test/
-		databases.yaml
-		databases.secret.yaml.example
+		mysql.yaml
+		mysql.secret.yaml.example
+		mongodb.yaml
+		mongodb.secret.yaml.example
+		kafka.yaml
 		<service-name>.yaml
 	uat/
-		databases.yaml
-		databases.secret.yaml.example
+		mysql.yaml
+		mysql.secret.yaml.example
+		mongodb.yaml
+		mongodb.secret.yaml.example
+		kafka.yaml
 		<service-name>.yaml
 
 namespaces/
 	dev.yaml
 	test.yaml
 	uat.yaml
-	dev-db.yaml
-	test-db.yaml
-	uat-db.yaml
+	dev-platform.yaml
+	test-platform.yaml
+	uat-platform.yaml
 ```
 
 Use generic service names such as `orders`, `catalog`, or `notifications`. Do not use architectural names such as `frontend` or `backend`.
 
 ## Namespace Model
 
-Application services use `dev`, `test`, and `uat`. Databases use `dev-db`, `test-db`, and `uat-db`. One environment can contain many services while its databases remain isolated in the matching database namespace.
+Application services use `dev`, `test`, and `uat`. Platform components use `dev-platform`, `test-platform`, and `uat-platform`. One environment can contain many services while its platform components remain isolated in the matching platform namespace.
 
 ## Step 1: Create Namespaces
 
@@ -73,74 +80,85 @@ Passwords are intentionally absent from tracked values files. Kubernetes `Secret
 Create ignored secret override files:
 
 ```bash
-cp environments/dev/databases.secret.yaml.example environments/dev/databases.secret.yaml
-cp environments/test/databases.secret.yaml.example environments/test/databases.secret.yaml
-cp environments/uat/databases.secret.yaml.example environments/uat/databases.secret.yaml
+cp environments/dev/mysql.secret.yaml.example environments/dev/mysql.secret.yaml
+cp environments/dev/mongodb.secret.yaml.example environments/dev/mongodb.secret.yaml
+cp environments/test/mysql.secret.yaml.example environments/test/mysql.secret.yaml
+cp environments/test/mongodb.secret.yaml.example environments/test/mongodb.secret.yaml
+cp environments/uat/mysql.secret.yaml.example environments/uat/mysql.secret.yaml
+cp environments/uat/mongodb.secret.yaml.example environments/uat/mongodb.secret.yaml
 ```
 
-Open each new `databases.secret.yaml` file and replace every `CHANGE_ME_*` value with a local password. Never commit these files. They are ignored by `.gitignore`.
+Open each new `mysql.secret.yaml` and `mongodb.secret.yaml` file and replace every `CHANGE_ME_*` value with a local password. Never commit these files. They are ignored by `.gitignore`.
 
-## Step 3: Validate the Database Chart
+## Step 3: Validate the Platform Charts
 
-Lint the chart:
+Lint each independent chart:
 
 ```bash
-helm lint ./helm/databases
+helm lint ./helm/platforms/mysql
+helm lint ./helm/platforms/mongodb
+helm lint ./helm/platforms/kafka
 ```
 
-Render each environment using both its normal and secret values:
+Render each chart independently. MySQL and MongoDB require their matching secret file:
 
 ```bash
-helm template databases ./helm/databases \
-	--namespace dev-db \
-	--values ./environments/dev/databases.yaml \
-	--values ./environments/dev/databases.secret.yaml
+helm template mysql ./helm/platforms/mysql \
+	--namespace dev-platform \
+	--values ./environments/dev/mysql.yaml \
+	--values ./environments/dev/mysql.secret.yaml
 
-helm template databases ./helm/databases \
-	--namespace test-db \
-	--values ./environments/test/databases.yaml \
-	--values ./environments/test/databases.secret.yaml
+helm template mongodb ./helm/platforms/mongodb \
+	--namespace dev-platform \
+	--values ./environments/dev/mongodb.yaml \
+	--values ./environments/dev/mongodb.secret.yaml
 
-helm template databases ./helm/databases \
-	--namespace uat-db \
-	--values ./environments/uat/databases.yaml \
-	--values ./environments/uat/databases.secret.yaml
+helm template kafka ./helm/platforms/kafka \
+	--namespace dev-platform \
+	--values ./environments/dev/kafka.yaml
 ```
 
-The chart intentionally fails if a secret values file is not supplied.
+## Step 4: Deploy Databases Independently
 
-## Step 4: Deploy Databases
+Deploy or update MySQL:
 
 ```bash
-helm upgrade --install databases ./helm/databases \
-	--namespace dev-db \
+helm upgrade --install mysql ./helm/platforms/mysql \
+	--namespace dev-platform \
 	--create-namespace \
-	--values ./environments/dev/databases.yaml \
-	--values ./environments/dev/databases.secret.yaml
-
-helm upgrade --install databases ./helm/databases \
-	--namespace test-db \
-	--create-namespace \
-	--values ./environments/test/databases.yaml \
-	--values ./environments/test/databases.secret.yaml
-
-helm upgrade --install databases ./helm/databases \
-	--namespace uat-db \
-	--create-namespace \
-	--values ./environments/uat/databases.yaml \
-	--values ./environments/uat/databases.secret.yaml
+	--values ./environments/dev/mysql.yaml \
+	--values ./environments/dev/mysql.secret.yaml
 ```
 
-Check the database workloads:
+Deploy or update MongoDB:
 
 ```bash
-kubectl get pods,svc,pvc -n dev-db
-kubectl get pods,svc,pvc -n test-db
-kubectl get pods,svc,pvc -n uat-db
-helm list -A
+helm upgrade --install mongodb ./helm/platforms/mongodb \
+	--namespace dev-platform \
+	--create-namespace \
+	--values ./environments/dev/mongodb.yaml \
+	--values ./environments/dev/mongodb.secret.yaml
 ```
 
-## Step 5: Add a Service
+Deploy or update Kafka:
+
+```bash
+helm upgrade --install kafka ./helm/platforms/kafka \
+	--namespace dev-platform \
+	--create-namespace \
+	--values ./environments/dev/kafka.yaml
+```
+
+Use the matching `test` or `uat` values files and namespaces for those environments. Check the independent releases and workloads:
+
+```bash
+helm list -n dev-platform
+kubectl get pods,svc,pvc -n dev-platform
+```
+
+Kafka uses `kafka.dev-platform.svc.cluster.local:9092` inside Kubernetes and `127.0.0.1:30094` from host-side tools.
+
+## Step 6: Add a Service
 
 For a service named `<service-name>`:
 
@@ -159,7 +177,7 @@ helm template <service-name> ./helm/services/<service-name> \
 	--values ./environments/dev/<service-name>.yaml
 ```
 
-## Step 6: Deploy a Service
+## Step 7: Deploy a Service
 
 ```bash
 helm upgrade --install <service-name> ./helm/services/<service-name> \
@@ -175,20 +193,23 @@ Use `test` or `uat` and the matching environment values for those deployments.
 Services inside the cluster use Kubernetes DNS:
 
 ```text
-mongodb.dev-db.svc.cluster.local:27017
-mysql.dev-db.svc.cluster.local:3306
+mongodb.dev-platform.svc.cluster.local:27017
+mysql.dev-platform.svc.cluster.local:3306
+kafka.dev-platform.svc.cluster.local:9092
 ```
 
-Replace `dev-db` with `test-db` or `uat-db` for the other environments.
+Replace `dev-platform` with `test-platform` or `uat-platform` for the other environments.
 
 Host-side tools use these NodePorts:
 
 ```text
-						 MongoDB    MySQL
-dev          30017      30306
-test         30018      30307
-uat          30019      30308
+Environment  MongoDB    MySQL       Kafka
+dev          30017      30306      30094
+test         30018      30307      30094
+uat          30019      30308      30094
 ```
+
+Kafka clients inside the cluster use `kafka.<env>-platform.svc.cluster.local:9092`. Host-side tools use `127.0.0.1:30094`.
 
 Example local MongoDB connection:
 
@@ -201,10 +222,13 @@ mongodb://<user>:<password>@127.0.0.1:30017/<database>
 ```bash
 kubectl get pods -A
 kubectl describe pod <pod-name> -n <namespace>
-kubectl logs deployment/mongodb -n dev-db
-kubectl logs deployment/mysql -n dev-db
-kubectl get endpoints -n dev-db
-helm get manifest databases -n dev-db
+kubectl logs deployment/mongodb -n dev-platform
+kubectl logs deployment/mysql -n dev-platform
+kubectl logs deployment/kafka -n dev-platform
+kubectl get endpoints -n dev-platform
+helm get manifest mysql -n dev-platform
+helm get manifest mongodb -n dev-platform
+helm get manifest kafka -n dev-platform
 ```
 
 Database PVCs are namespace-scoped. Do not move a database to another namespace without a backup and restore plan. For disposable local data, uninstall the old release and install the new one only when data loss is acceptable.

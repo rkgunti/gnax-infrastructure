@@ -1,0 +1,15 @@
+database:
+  namespace: dev-platform
+
+mongodb:
+  enabled: true
+  rootUser: root
+  username: devuser
+  database: devdb
+  pvc:
+    name: mongo-pvc
+    size: 10Gi
+  service:
+    type: NodePort
+    port: 27017
+    nodePort: 30017

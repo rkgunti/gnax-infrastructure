@@ -1,0 +1,15 @@
+database:
+  namespace: uat-platform
+
+mongodb:
+  enabled: true
+  rootUser: root
+  username: uatuser
+  database: uatdb
+  pvc:
+    name: mongo-pvc
+    size: 10Gi
+  service:
+    type: NodePort
+    port: 27017
+    nodePort: 30019

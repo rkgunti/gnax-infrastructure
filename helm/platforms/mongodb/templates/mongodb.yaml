@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: mongo-secret
-  namespace: {{ .Values.database.namespace }}
+  namespace: {{ .Release.Namespace }}
 type: Opaque
 stringData:
   MONGO_INITDB_ROOT_USERNAME: {{ .Values.mongodb.rootUser | quote }}
@@ -16,7 +16,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mongo-init-script
-  namespace: {{ .Values.database.namespace }}
+  namespace: {{ .Release.Namespace }}
 data:
   init-mongo.sh: |
     #!/bin/bash
@@ -26,9 +26,9 @@ data:
       exit 0
     fi
 
-    mongosh --quiet --host localhost --port 27017 \\
-      -u "${MONGO_INITDB_ROOT_USERNAME}" \\
-      -p "${MONGO_INITDB_ROOT_PASSWORD}" \\
+    mongosh --quiet --host localhost --port 27017 \
+      -u "${MONGO_INITDB_ROOT_USERNAME}" \
+      -p "${MONGO_INITDB_ROOT_PASSWORD}" \
       --authenticationDatabase admin <<'EOF'
     const appUser = process.env.MONGO_USERNAME;
     const appPassword = process.env.MONGO_PASSWORD;
@@ -53,7 +53,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ .Values.mongodb.pvc.name }}
-  namespace: {{ .Values.database.namespace }}
+  namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
     - ReadWriteOnce
@@ -65,7 +65,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mongodb
-  namespace: {{ .Values.database.namespace }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   strategy:
@@ -178,7 +178,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mongodb
-  namespace: {{ .Values.database.namespace }}
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     app: mongodb

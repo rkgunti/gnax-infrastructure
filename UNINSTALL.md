@@ -29,9 +29,9 @@ The repository namespaces are:
 dev
 test
 uat
-dev-db
-test-db
-uat-db
+dev-platform
+test-platform
+uat-platform
 ```
 
 Do not delete a namespace if it contains resources managed outside this repository.
@@ -60,50 +60,50 @@ If services were installed with a different release name, use the name shown by 
 
 ## 4. Remove Database Releases
 
-The current migrated releases may still be named `platform`, while new installations should use `databases`. Check first:
+MySQL, MongoDB, and Kafka are independent Helm releases. Check first:
 
 ```bash
-helm list -n dev-db
-helm list -n test-db
-helm list -n uat-db
+helm list -n dev-platform
+helm list -n test-platform
+helm list -n uat-platform
 ```
 
-Uninstall the database release found in each database namespace:
+Uninstall the releases that are installed in each database namespace:
 
 ```bash
-helm uninstall platform --namespace dev-db
-helm uninstall platform --namespace test-db
-helm uninstall platform --namespace uat-db
+helm uninstall mysql --namespace dev-platform
+helm uninstall mongodb --namespace dev-platform
+helm uninstall kafka --namespace dev-platform
+
+helm uninstall mysql --namespace test-platform
+helm uninstall mongodb --namespace test-platform
+helm uninstall kafka --namespace test-platform
+
+helm uninstall mysql --namespace uat-platform
+helm uninstall mongodb --namespace uat-platform
+helm uninstall kafka --namespace uat-platform
 ```
 
-For releases created with the newer name, use:
+Only run commands for releases that exist. A missing release is harmless; check `helm list -n <namespace>` first.
+
+## 5. Decide What to Do With Database and Kafka PVCs
+
+Inspect remaining PVCs, including Kafka data:
 
 ```bash
-helm uninstall databases --namespace dev-db
-helm uninstall databases --namespace test-db
-helm uninstall databases --namespace uat-db
-```
-
-Only run the command for a release that exists. A missing release is harmless; do not uninstall both names unless both are listed.
-
-## 5. Decide What to Do With Database PVCs
-
-Inspect remaining PVCs:
-
-```bash
-kubectl get pvc -n dev-db
-kubectl get pvc -n test-db
-kubectl get pvc -n uat-db
+kubectl get pvc -n dev-platform
+kubectl get pvc -n test-platform
+kubectl get pvc -n uat-platform
 ```
 
 If database data must be preserved, stop here and create a backup before deleting PVCs.
 
-For a complete disposable local reset, delete the database PVCs:
+For a complete disposable local reset, delete the database and Kafka PVCs:
 
 ```bash
-kubectl delete pvc --all -n dev-db
-kubectl delete pvc --all -n test-db
-kubectl delete pvc --all -n uat-db
+kubectl delete pvc --all -n dev-platform
+kubectl delete pvc --all -n test-platform
+kubectl delete pvc --all -n uat-platform
 ```
 
 Deleting PVCs permanently removes the local database data when the underlying storage is reclaimed.
@@ -119,14 +119,14 @@ kubectl delete -f namespaces/
 Or delete them explicitly:
 
 ```bash
-kubectl delete namespace dev test uat dev-db test-db uat-db
+kubectl delete namespace dev test uat dev-platform test-platform uat-platform
 ```
 
 Wait for deletion to complete:
 
 ```bash
 kubectl wait --for=delete namespace/dev namespace/test namespace/uat \
-  namespace/dev-db namespace/test-db namespace/uat-db \
+  namespace/dev-platform namespace/test-platform namespace/uat-platform \
   --timeout=120s
 ```
 
@@ -155,18 +155,31 @@ To recreate the platform after cleanup:
 ```bash
 kubectl apply -f namespaces/
 
-cp environments/dev/databases.secret.yaml.example \
-   environments/dev/databases.secret.yaml
+cp environments/dev/mysql.secret.yaml.example \
+  environments/dev/mysql.secret.yaml
+cp environments/dev/mongodb.secret.yaml.example \
+  environments/dev/mongodb.secret.yaml
 
 # Edit the local secret file before continuing.
 
-helm upgrade --install databases ./helm/databases \
-  --namespace dev-db \
+helm upgrade --install mysql ./helm/platforms/mysql \
+  --namespace dev-platform \
   --create-namespace \
-  --values environments/dev/databases.yaml \
-  --values environments/dev/databases.secret.yaml
+  --values environments/dev/mysql.yaml \
+  --values environments/dev/mysql.secret.yaml
+
+helm upgrade --install mongodb ./helm/platforms/mongodb \
+  --namespace dev-platform \
+  --create-namespace \
+  --values environments/dev/mongodb.yaml \
+  --values environments/dev/mongodb.secret.yaml
+
+helm upgrade --install kafka ./helm/platforms/kafka \
+  --namespace dev-platform \
+  --create-namespace \
+  --values environments/dev/kafka.yaml
 ```
 
-Repeat the secret-file creation and Helm deployment for `test-db` and `uat-db` with their matching environment files.
+Repeat the secret-file creation and independent Helm deployments for `test-platform` and `uat-platform` with their matching environment files.
 
 Deploy application services only after the required database namespaces and database Services are ready.

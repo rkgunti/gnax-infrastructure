@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: uat-db
+  name: uat-platform
   labels:
     platform.environment: uat
     platform.role: database

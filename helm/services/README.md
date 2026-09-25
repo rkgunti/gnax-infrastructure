@@ -14,4 +14,4 @@ Environment namespaces:
 - `test`
 - `uat`
 
-Database namespaces are separate: `dev-db`, `test-db`, and `uat-db`.
+Platform namespaces are separate: `dev-platform`, `test-platform`, and `uat-platform`.

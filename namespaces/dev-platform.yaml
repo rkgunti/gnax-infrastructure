@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: dev-db
+  name: dev-platform
   labels:
     platform.environment: dev
     platform.role: database
