@@ -1,5 +1,5 @@
-# K8s Local Platform
-
+# gnax-infrastructure
+Infrastructure and deployment configurations for the GnaX platform and AccessFlow applications, including Kubernetes, Helm, Kafka, databases, Redis, networking, and environment configurations.
 Local Kubernetes platform running on Rancher Desktop with independent database and service releases.
 
 ## Prerequisites
