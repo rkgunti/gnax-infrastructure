@@ -99,6 +99,7 @@ Lint each independent chart:
 helm lint ./helm/infra/mysql
 helm lint ./helm/infra/mongodb
 helm lint ./helm/infra/kafka
+helm lint ./helm/infra/config-server
 ```
 
 Render each chart independently. MySQL and MongoDB require their matching secret file:
@@ -117,6 +118,11 @@ helm template mongodb ./helm/infra/mongodb \
 helm template kafka ./helm/infra/kafka \
 	--namespace dev-infra \
 	--values ./environments/dev/kafka.yaml
+
+helm template config-server ./helm/infra/config-server \
+	--namespace dev \
+	--values ./environments/dev/config-server.yaml \
+	--values ./environments/dev/config-server.secret.yaml
 ```
 
 ## Step 4: Deploy Databases Independently
@@ -145,7 +151,7 @@ Deploy or update the Config Server secret (`config-server-secret`, keys `CONFIG_
 
 ```bash
 helm upgrade --install config-server ./helm/infra/config-server \
-	--namespace dev-infra \
+	--namespace dev \
 	--create-namespace \
 	--values ./environments/dev/config-server.yaml \
 	--values ./environments/dev/config-server.secret.yaml
@@ -198,6 +204,63 @@ helm upgrade --install <service-name> ./helm/services/<service-name> \
 ```
 
 Use `test` or `uat` and the matching environment values for those deployments.
+
+## Deploy the Config Server (dev)
+
+The config server runs in the `dev` namespace as the `gnax-config-server` Helm release (Kubernetes Deployment and Service name: `config-server`).
+
+1. Create the secret file and set the credentials and Git URI (the file is git-ignored):
+
+```bash
+cp environments/dev/config-server.secret.yaml.example environments/dev/config-server.secret.yaml
+```
+
+2. Install the `config-server-secret` into `dev` and confirm it exists:
+
+```bash
+helm upgrade --install config-server ./helm/infra/config-server \
+	--namespace dev \
+	--create-namespace \
+	--values ./environments/dev/config-server.yaml \
+	--values ./environments/dev/config-server.secret.yaml
+kubectl -n dev get secret config-server-secret
+```
+
+3. Build the image so the local cluster can use it (Rancher Desktop with dockerd; for containerd use `nerdctl --namespace k8s.io build`):
+
+```bash
+docker build -t gnax-config-server:0.0.1-SNAPSHOT /Users/rk/workspace/git/gnax/gnax-config-server
+```
+
+4. Validate the chart:
+
+```bash
+helm lint ./helm/services/gnax-config-server
+helm template gnax-config-server ./helm/services/gnax-config-server \
+	--namespace dev \
+	--values ./environments/dev/gnax-config-server.yaml
+```
+
+5. Deploy the application and wait for it:
+
+```bash
+helm upgrade --install gnax-config-server ./helm/services/gnax-config-server \
+	--namespace dev \
+	--values ./environments/dev/gnax-config-server.yaml
+kubectl -n dev rollout status deployment/config-server
+```
+
+6. Verify (use the credentials from the secret file):
+
+```bash
+kubectl -n dev get pods,svc -l app.kubernetes.io/name=config-server
+kubectl -n dev port-forward svc/config-server 8888:8888
+curl -u <username>:<password> http://localhost:8888/actuator/health
+```
+
+In-cluster URL for other services: `http://config-server.dev.svc.cluster.local:8888` (basic auth from the secret).
+
+To change config only, re-run step 5; after code changes, rebuild the image (step 3, optionally with a new tag in `environments/dev/gnax-config-server.yaml`) and re-run step 5. If the pod fails to start, check `kubectl -n dev logs deploy/config-server`.
 
 ## Connection Details
 
