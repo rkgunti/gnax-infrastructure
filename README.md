@@ -86,6 +86,7 @@ cp environments/test/mysql.secret.yaml.example environments/test/mysql.secret.ya
 cp environments/test/mongodb.secret.yaml.example environments/test/mongodb.secret.yaml
 cp environments/uat/mysql.secret.yaml.example environments/uat/mysql.secret.yaml
 cp environments/uat/mongodb.secret.yaml.example environments/uat/mongodb.secret.yaml
+for e in dev test uat; do cp environments/$e/config-server.secret.yaml.example environments/$e/config-server.secret.yaml; done
 ```
 
 Open each new `mysql.secret.yaml` and `mongodb.secret.yaml` file and replace every `CHANGE_ME_*` value with a local password. Never commit these files. They are ignored by `.gitignore`.
@@ -138,6 +139,16 @@ helm upgrade --install mongodb ./helm/infra/mongodb \
 	--create-namespace \
 	--values ./environments/dev/mongodb.yaml \
 	--values ./environments/dev/mongodb.secret.yaml
+```
+
+Deploy or update the Config Server secret (`config-server-secret`, keys `CONFIG_SERVER_USERNAME`, `CONFIG_SERVER_PASSWORD`, `CONFIG_GIT_URI`). Reference it from the config server deployment with `envFrom.secretRef.name: config-server-secret`; the Spring `${...}` placeholders then resolve from these env vars:
+
+```bash
+helm upgrade --install config-server ./helm/infra/config-server \
+	--namespace dev-infra \
+	--create-namespace \
+	--values ./environments/dev/config-server.yaml \
+	--values ./environments/dev/config-server.secret.yaml
 ```
 
 Deploy or update Kafka:

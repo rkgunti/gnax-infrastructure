@@ -1,0 +1,3 @@
+configServer:
+  enabled: true
+  secretName: config-server-secret
