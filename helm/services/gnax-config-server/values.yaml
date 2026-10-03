@@ -8,8 +8,8 @@ image:
   tag: "0.0.1-SNAPSHOT"
   pullPolicy: IfNotPresent
 
-# Secret created by helm/services/config-server (CONFIG_SERVER_USERNAME, CONFIG_SERVER_PASSWORD, CONFIG_GIT_URI)
-secretName: config-server-secret
+configServer:
+  secretName: config-server-secret
 
 service:
   type: ClusterIP

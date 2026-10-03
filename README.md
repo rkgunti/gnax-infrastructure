@@ -79,8 +79,7 @@ Each chart's README contains install, operation, and uninstall instructions:
 - [MongoDB](./helm/infra/mongodb/README.md)
 - [PostgreSQL](./helm/infra/postgresql/README.md)
 - [Kafka](./helm/infra/kafka/README.md)
-- [Config Server secret](./helm/services/config-server/README.md)
-- [GnaX Config Server service](./helm/services/gnax-config-server/README.md)
+- [GnaX Config Server service and Secret](./helm/services/gnax-config-server/README.md)
 
 ## Step 1: Create Namespaces
 
@@ -105,10 +104,12 @@ cp environments/test/postgresql.secret.yaml.example environments/test/postgresql
 cp environments/uat/mysql.secret.yaml.example environments/uat/mysql.secret.yaml
 cp environments/uat/mongodb.secret.yaml.example environments/uat/mongodb.secret.yaml
 cp environments/uat/postgresql.secret.yaml.example environments/uat/postgresql.secret.yaml
-for e in dev test uat; do cp environments/$e/config-server.secret.yaml.example environments/$e/config-server.secret.yaml; done
+for e in dev test uat; do cp environments/$e/gnax-config-server.secret.yaml.example environments/$e/gnax-config-server.secret.yaml; done
 ```
 
-Open each new `mysql.secret.yaml`, `mongodb.secret.yaml`, and `postgresql.secret.yaml` file and replace every `CHANGE_ME_*` value with a local password. Never commit these files. They are ignored by `.gitignore`.
+Open each new database secret file and the `gnax-config-server.secret.yaml` files,
+then replace every `CHANGE_ME_*` value with the appropriate local value.
+Never commit these files; they are ignored by `.gitignore`.
 
 ## Step 3: Validate the Infrastructure Charts
 
@@ -119,11 +120,9 @@ helm lint ./helm/infra/mysql --set mysql.rootPassword=lint-only --set mysql.pass
 helm lint ./helm/infra/mongodb --set mongodb.rootPassword=lint-only --set mongodb.password=lint-only
 helm lint ./helm/infra/postgresql --set postgresql.password=lint-only
 helm lint ./helm/infra/kafka
-helm lint ./helm/services/config-server \
-	--set configServer.username=lint-only \
-	--set configServer.password=lint-only \
-	--set configServer.gitUri=https://example.invalid/config.git
-helm lint ./helm/services/gnax-config-server
+helm lint ./helm/services/gnax-config-server \
+	--values ./environments/dev/gnax-config-server.yaml \
+	--values ./environments/dev/gnax-config-server.secret.yaml.example
 ```
 
 Render each chart independently. Database and Config Server secret charts
@@ -149,10 +148,10 @@ helm template kafka ./helm/infra/kafka \
 	--namespace dev-infra \
 	--values ./environments/dev/kafka.yaml
 
-helm template config-server ./helm/services/config-server \
+helm template gnax-config-server ./helm/services/gnax-config-server \
 	--namespace dev \
-	--values ./environments/dev/config-server.yaml \
-	--values ./environments/dev/config-server.secret.yaml
+	--values ./environments/dev/gnax-config-server.yaml \
+	--values ./environments/dev/gnax-config-server.secret.yaml
 ```
 
 ## Step 4: Deploy Databases Independently
@@ -189,17 +188,13 @@ helm upgrade --install postgresql ./helm/infra/postgresql \
 
 Repeat the database release commands with the matching environment values and namespace to deploy independently into `test-infra` or `uat-infra`.
 
-Deploy or update the Config Server secret (`config-server-secret`, keys `CONFIG_SERVER_USERNAME`, `CONFIG_SERVER_PASSWORD`, `CONFIG_GIT_URI`):
-
-```bash
-helm upgrade --install config-server ./helm/services/config-server \
-	--namespace dev \
-	--create-namespace \
-	--values ./environments/dev/config-server.yaml \
-	--values ./environments/dev/config-server.secret.yaml
-```
-
-The service chart reads the `config-server-secret` through `envFrom.secretRef`; the Spring `${...}` placeholders resolve from these environment variables.
+The Config Server's Secret (`config-server-secret`) is created by the
+`gnax-config-server` chart together with its Deployment and Service. Supply
+`environments/dev/gnax-config-server.secret.yaml` when deploying the service below.
+If an existing cluster still has a separate Helm release named `config-server`
+in `dev`, follow the one-time migration instructions in the
+[Config Server README](./helm/services/gnax-config-server/README.md) before
+upgrading; the existing release must relinquish the Secret first.
 
 Deploy or update Kafka:
 
@@ -252,50 +247,46 @@ Use `test` or `uat` and the matching environment values for those deployments.
 
 ## Deploy the Config Server (dev)
 
-The config server runs in the `dev` namespace as the `gnax-config-server` Helm release (Kubernetes Deployment and Service name: `config-server`).
+The config server and its `config-server-secret` are managed together by the
+`gnax-config-server` Helm release in the `dev` namespace (Kubernetes
+Deployment and Service name: `config-server`).
 
 1. Create the secret file and set the credentials and Git URI (the file is git-ignored):
 
 ```bash
-cp environments/dev/config-server.secret.yaml.example environments/dev/config-server.secret.yaml
+cp environments/dev/gnax-config-server.secret.yaml.example environments/dev/gnax-config-server.secret.yaml
 ```
 
-2. Install the `config-server-secret` into `dev` and confirm it exists:
+2. Build the image so the local cluster can use it (Rancher Desktop with dockerd; for containerd use `nerdctl --namespace k8s.io build`):
 
 ```bash
-helm upgrade --install config-server ./helm/services/config-server \
-	--namespace dev \
-	--create-namespace \
-	--values ./environments/dev/config-server.yaml \
-	--values ./environments/dev/config-server.secret.yaml
-kubectl -n dev get secret config-server-secret
+docker build -t gnax-config-server:0.0.1-SNAPSHOT ../gnax-config-server
 ```
 
-3. Build the image so the local cluster can use it (Rancher Desktop with dockerd; for containerd use `nerdctl --namespace k8s.io build`):
+3. Validate the chart and render the service resources, including its Secret:
 
 ```bash
-docker build -t gnax-config-server:0.0.1-SNAPSHOT /Users/rk/workspace/git/gnax/gnax-config-server
-```
-
-4. Validate the chart:
-
-```bash
-helm lint ./helm/services/gnax-config-server
+helm lint ./helm/services/gnax-config-server \
+	--values ./environments/dev/gnax-config-server.yaml \
+	--values ./environments/dev/gnax-config-server.secret.yaml
 helm template gnax-config-server ./helm/services/gnax-config-server \
 	--namespace dev \
-	--values ./environments/dev/gnax-config-server.yaml
+	--values ./environments/dev/gnax-config-server.yaml \
+	--values ./environments/dev/gnax-config-server.secret.yaml
 ```
 
-5. Deploy the application and wait for it:
+4. Deploy the application and its Secret in one Helm release, then wait for it:
 
 ```bash
 helm upgrade --install gnax-config-server ./helm/services/gnax-config-server \
 	--namespace dev \
-	--values ./environments/dev/gnax-config-server.yaml
+	--values ./environments/dev/gnax-config-server.yaml \
+	--values ./environments/dev/gnax-config-server.secret.yaml
 kubectl -n dev rollout status deployment/config-server
+kubectl -n dev get secret config-server-secret
 ```
 
-6. Verify (use the credentials from the secret file):
+5. Verify (use the credentials from the secret file):
 
 ```bash
 kubectl -n dev get pods,svc -l app.kubernetes.io/name=config-server
@@ -305,7 +296,17 @@ curl -u <username>:<password> http://localhost:8888/actuator/health
 
 In-cluster URL for other services: `http://config-server.dev.svc.cluster.local:8888` (basic auth from the secret).
 
-To change config only, re-run step 5; after code changes, rebuild the image (step 3, optionally with a new tag in `environments/dev/gnax-config-server.yaml`) and re-run step 5. If the pod fails to start, check `kubectl -n dev logs deploy/config-server`.
+To change config or credentials, rerun the Helm upgrade with both values files
+and restart the Deployment so it reloads the updated Secret:
+
+```bash
+kubectl -n dev rollout restart deployment/config-server
+kubectl -n dev rollout status deployment/config-server
+```
+
+After code changes, rebuild the image (step 2, optionally with a new tag in
+`environments/dev/gnax-config-server.yaml`) and rerun the upgrade. If the Pod
+fails to start, check `kubectl -n dev logs deploy/config-server`.
 
 ## Connection Details
 
@@ -414,20 +415,11 @@ helm uninstall <release-name> --namespace uat
 Helm removes the release-managed Deployments, Pods, Services, and other
 resources. Check for manually created resources separately.
 
-### 3. Remove the Config Server secret release
+The `gnax-config-server` release also manages the Config Server Kubernetes
+Secret. Uninstalling the application release removes both together; there is
+no separate Config Server secret release.
 
-After uninstalling the application release, remove the independent secret
-release from `dev`:
-
-```bash
-helm uninstall config-server --namespace dev
-```
-
-This removes the Kubernetes `config-server-secret`. Do not remove it while the
-Config Server is still in use; its credentials and Git URI are needed when the
-application starts.
-
-### 4. Remove infrastructure releases
+### 3. Remove infrastructure releases
 
 Each infrastructure component is an independent Helm release in each matching
 `*-infra` namespace. Check installed releases first:
@@ -463,7 +455,7 @@ underlying storage and data are reclaimed depends on the cluster's storage
 class and reclaim policy. Take and verify backups before uninstalling; inspect
 PVCs and persistent volumes before any manual storage cleanup.
 
-### 5. Remove namespaces only when empty and no longer needed
+### 4. Remove namespaces only when empty and no longer needed
 
 First confirm there are no remaining workloads, Secrets, ConfigMaps, or PVCs
 and no resources from other projects in these namespaces. Deleting a namespace
@@ -485,11 +477,11 @@ definitions:
 kubectl delete -f namespaces/
 ```
 
-### 6. Remove local secret override files (optional)
+### 5. Remove local secret override files (optional)
 
 Helm uninstall does not delete local files. Files matching `*.secret.yaml` are
 ignored by Git and remain on disk. Remove only the specific local secret files
-you no longer need, such as the MySQL, MongoDB, PostgreSQL, and Config Server
-secret overrides in `environments/<env>/`.
+you no longer need, such as the MySQL, MongoDB, PostgreSQL, and
+`gnax-config-server` secret overrides in `environments/<env>/`.
 
 For team or CI usage, use an encrypted secret workflow such as SOPS with age or a secret manager such as Vault or External Secrets. Do not treat base64-encoded Kubernetes Secret manifests as encryption.

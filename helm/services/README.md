@@ -19,10 +19,9 @@ Infrastructure namespaces are separate: `dev-infra`, `test-infra`, and `uat-infr
 Service-specific setup, deployment, and uninstall instructions are in each
 service chart's `README.md`. Current chart documentation:
 
-- [Config Server secret release](./config-server/README.md)
-- [GnaX Config Server](./gnax-config-server/README.md)
+- [GnaX Config Server](./gnax-config-server/README.md), including its Secret
 
 Uninstall a service with `helm uninstall <release-name> --namespace <env>`
-after checking the exact release name with `helm list --namespace <env>`. Keep
-secrets that the running service still needs; remove secret releases after
-their dependent application release has been uninstalled.
+after checking the exact release name with `helm list --namespace <env>`.
+Charts that manage Secrets alongside an application remove both in the same
+release; check each chart README for any separately managed resources.

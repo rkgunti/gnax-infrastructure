@@ -1,6 +1,9 @@
 image:
   tag: "0.0.1-SNAPSHOT"
 
+configServer:
+  secretName: config-server-secret
+  
 service:
   type: NodePort
   nodePort: 30888
