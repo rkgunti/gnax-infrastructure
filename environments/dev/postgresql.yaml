@@ -1,0 +1,14 @@
+database:
+  namespace: dev-infra
+
+postgresql:
+  enabled: true
+  database: devdb
+  user: devuser
+  pvc:
+    name: postgresql-pvc
+    size: 8Gi
+  service:
+    type: NodePort
+    port: 5432
+    nodePort: 30432

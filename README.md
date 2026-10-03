@@ -24,6 +24,7 @@ helm/
 	infra/
 		mysql/
 		mongodb/
+		postgresql/
 		kafka/
 	services/
 		<service-name>/
@@ -34,6 +35,8 @@ environments/
 		mysql.secret.yaml.example
 		mongodb.yaml
 		mongodb.secret.yaml.example
+		postgresql.yaml
+		postgresql.secret.yaml.example
 		kafka.yaml
 		<service-name>.yaml
 	test/
@@ -41,6 +44,8 @@ environments/
 		mysql.secret.yaml.example
 		mongodb.yaml
 		mongodb.secret.yaml.example
+		postgresql.yaml
+		postgresql.secret.yaml.example
 		kafka.yaml
 		<service-name>.yaml
 	uat/
@@ -48,6 +53,8 @@ environments/
 		mysql.secret.yaml.example
 		mongodb.yaml
 		mongodb.secret.yaml.example
+		postgresql.yaml
+		postgresql.secret.yaml.example
 		kafka.yaml
 		<service-name>.yaml
 
@@ -66,6 +73,15 @@ Use generic service names such as `orders`, `catalog`, or `notifications`. Do no
 
 Application services use `dev`, `test`, and `uat`. Infrastructure components use `dev-infra`, `test-infra`, and `uat-infra`. One environment can contain many services while its infrastructure components remain isolated in the matching infrastructure namespace.
 
+Each chart's README contains install, operation, and uninstall instructions:
+
+- [MySQL](./helm/infra/mysql/README.md)
+- [MongoDB](./helm/infra/mongodb/README.md)
+- [PostgreSQL](./helm/infra/postgresql/README.md)
+- [Kafka](./helm/infra/kafka/README.md)
+- [Config Server secret](./helm/services/config-server/README.md)
+- [GnaX Config Server service](./helm/services/gnax-config-server/README.md)
+
 ## Step 1: Create Namespaces
 
 ```bash
@@ -82,27 +98,36 @@ Create ignored secret override files:
 ```bash
 cp environments/dev/mysql.secret.yaml.example environments/dev/mysql.secret.yaml
 cp environments/dev/mongodb.secret.yaml.example environments/dev/mongodb.secret.yaml
+cp environments/dev/postgresql.secret.yaml.example environments/dev/postgresql.secret.yaml
 cp environments/test/mysql.secret.yaml.example environments/test/mysql.secret.yaml
 cp environments/test/mongodb.secret.yaml.example environments/test/mongodb.secret.yaml
+cp environments/test/postgresql.secret.yaml.example environments/test/postgresql.secret.yaml
 cp environments/uat/mysql.secret.yaml.example environments/uat/mysql.secret.yaml
 cp environments/uat/mongodb.secret.yaml.example environments/uat/mongodb.secret.yaml
+cp environments/uat/postgresql.secret.yaml.example environments/uat/postgresql.secret.yaml
 for e in dev test uat; do cp environments/$e/config-server.secret.yaml.example environments/$e/config-server.secret.yaml; done
 ```
 
-Open each new `mysql.secret.yaml` and `mongodb.secret.yaml` file and replace every `CHANGE_ME_*` value with a local password. Never commit these files. They are ignored by `.gitignore`.
+Open each new `mysql.secret.yaml`, `mongodb.secret.yaml`, and `postgresql.secret.yaml` file and replace every `CHANGE_ME_*` value with a local password. Never commit these files. They are ignored by `.gitignore`.
 
 ## Step 3: Validate the Infrastructure Charts
 
 Lint each independent chart:
 
 ```bash
-helm lint ./helm/infra/mysql
-helm lint ./helm/infra/mongodb
+helm lint ./helm/infra/mysql --set mysql.rootPassword=lint-only --set mysql.password=lint-only
+helm lint ./helm/infra/mongodb --set mongodb.rootPassword=lint-only --set mongodb.password=lint-only
+helm lint ./helm/infra/postgresql --set postgresql.password=lint-only
 helm lint ./helm/infra/kafka
-helm lint ./helm/infra/config-server
+helm lint ./helm/services/config-server \
+	--set configServer.username=lint-only \
+	--set configServer.password=lint-only \
+	--set configServer.gitUri=https://example.invalid/config.git
+helm lint ./helm/services/gnax-config-server
 ```
 
-Render each chart independently. MySQL and MongoDB require their matching secret file:
+Render each chart independently. Database and Config Server secret charts
+require their matching local secret override file:
 
 ```bash
 helm template mysql ./helm/infra/mysql \
@@ -115,11 +140,16 @@ helm template mongodb ./helm/infra/mongodb \
 	--values ./environments/dev/mongodb.yaml \
 	--values ./environments/dev/mongodb.secret.yaml
 
+helm template postgresql ./helm/infra/postgresql \
+	--namespace dev-infra \
+	--values ./environments/dev/postgresql.yaml \
+	--values ./environments/dev/postgresql.secret.yaml
+
 helm template kafka ./helm/infra/kafka \
 	--namespace dev-infra \
 	--values ./environments/dev/kafka.yaml
 
-helm template config-server ./helm/infra/config-server \
+helm template config-server ./helm/services/config-server \
 	--namespace dev \
 	--values ./environments/dev/config-server.yaml \
 	--values ./environments/dev/config-server.secret.yaml
@@ -147,15 +177,29 @@ helm upgrade --install mongodb ./helm/infra/mongodb \
 	--values ./environments/dev/mongodb.secret.yaml
 ```
 
-Deploy or update the Config Server secret (`config-server-secret`, keys `CONFIG_SERVER_USERNAME`, `CONFIG_SERVER_PASSWORD`, `CONFIG_GIT_URI`). Reference it from the config server deployment with `envFrom.secretRef.name: config-server-secret`; the Spring `${...}` placeholders then resolve from these env vars:
+Deploy or update PostgreSQL:
 
 ```bash
-helm upgrade --install config-server ./helm/infra/config-server \
+helm upgrade --install postgresql ./helm/infra/postgresql \
+	--namespace dev-infra \
+	--create-namespace \
+	--values ./environments/dev/postgresql.yaml \
+	--values ./environments/dev/postgresql.secret.yaml
+```
+
+Repeat the database release commands with the matching environment values and namespace to deploy independently into `test-infra` or `uat-infra`.
+
+Deploy or update the Config Server secret (`config-server-secret`, keys `CONFIG_SERVER_USERNAME`, `CONFIG_SERVER_PASSWORD`, `CONFIG_GIT_URI`):
+
+```bash
+helm upgrade --install config-server ./helm/services/config-server \
 	--namespace dev \
 	--create-namespace \
 	--values ./environments/dev/config-server.yaml \
 	--values ./environments/dev/config-server.secret.yaml
 ```
+
+The service chart reads the `config-server-secret` through `envFrom.secretRef`; the Spring `${...}` placeholders resolve from these environment variables.
 
 Deploy or update Kafka:
 
@@ -184,6 +228,7 @@ For a service named `<service-name>`:
 3. Keep the service release in `dev`, `test`, or `uat`, never in a database namespace.
 4. Use a `ClusterIP` Service for normal in-cluster traffic.
 5. Add ingress or `NodePort` only when host or external access is required.
+6. Add a `README.md` beside the chart with its configuration, install, verification, and uninstall instructions. Document any separate Secrets, ConfigMaps, PVCs, or other resources and their data-retention behavior.
 
 Validate the service chart:
 
@@ -218,7 +263,7 @@ cp environments/dev/config-server.secret.yaml.example environments/dev/config-se
 2. Install the `config-server-secret` into `dev` and confirm it exists:
 
 ```bash
-helm upgrade --install config-server ./helm/infra/config-server \
+helm upgrade --install config-server ./helm/services/config-server \
 	--namespace dev \
 	--create-namespace \
 	--values ./environments/dev/config-server.yaml \
@@ -269,6 +314,7 @@ Services inside the cluster use Kubernetes DNS:
 ```text
 mongodb.dev-infra.svc.cluster.local:27017
 mysql.dev-infra.svc.cluster.local:3306
+postgresql.dev-infra.svc.cluster.local:5432
 kafka.dev-infra.svc.cluster.local:9092
 ```
 
@@ -277,10 +323,10 @@ Replace `dev-infra` with `test-infra` or `uat-infra` for the other environments.
 Host-side tools use these NodePorts:
 
 ```text
-Environment  MongoDB    MySQL       Kafka
-dev          30017      30306      30094
-test         30018      30307      30094
-uat          30019      30308      30094
+Environment  MongoDB    MySQL       PostgreSQL  Kafka
+dev          30017      30306      30432       30094
+test         30018      30307      30433       30094
+uat          30019      30308      30434       30094
 ```
 
 Kafka clients inside the cluster use `kafka.<env>-infra.svc.cluster.local:9092`. Host-side tools use `127.0.0.1:30094`.
@@ -291,6 +337,12 @@ Example local MongoDB connection:
 mongodb://<user>:<password>@127.0.0.1:30017/<database>
 ```
 
+Example local PostgreSQL connection:
+
+```text
+postgresql://devuser:<password>@127.0.0.1:30432/devdb
+```
+
 ## Troubleshooting
 
 ```bash
@@ -298,17 +350,146 @@ kubectl get pods -A
 kubectl describe pod <pod-name> -n <namespace>
 kubectl logs deployment/mongodb -n dev-infra
 kubectl logs deployment/mysql -n dev-infra
+kubectl logs deployment/postgresql -n dev-infra
 kubectl logs deployment/kafka -n dev-infra
 kubectl get endpoints -n dev-infra
 helm get manifest mysql -n dev-infra
 helm get manifest mongodb -n dev-infra
+helm get manifest postgresql -n dev-infra
 helm get manifest kafka -n dev-infra
 ```
 
-Database PVCs are namespace-scoped. Do not move a database to another namespace without a backup and restore plan. For disposable local data, uninstall the old release and install the new one only when data loss is acceptable.
+Database and Kafka PVCs are namespace-scoped. Do not move persistent data to
+another namespace without a backup and restore plan. For disposable local
+data, uninstall the old release and install the new one only when data loss is
+acceptable.
 
 ## Complete Cleanup
 
-See [UNINSTALL.md](UNINSTALL.md) for the step-by-step procedure to remove service releases, database releases, PVCs, namespaces, and local secret files.
+These steps remove repository-managed services and infrastructure from the
+currently selected Kubernetes cluster. They can delete Kubernetes Secrets,
+ConfigMaps, workloads (Deployments/Pods), Services, PVCs, namespaces, and
+database or Kafka data. Confirm the selected Rancher Desktop context and back
+up any data you need before proceeding.
+
+### 1. Inventory the cluster
+
+```bash
+kubectl config current-context
+kubectl get nodes
+helm list -A
+kubectl get namespaces
+kubectl get all,secret,configmap,pvc -n dev
+kubectl get all,secret,configmap,pvc -n test
+kubectl get all,secret,configmap,pvc -n uat
+kubectl get all,secret,configmap,pvc -n dev-infra
+kubectl get all,secret,configmap,pvc -n test-infra
+kubectl get all,secret,configmap,pvc -n uat-infra
+```
+
+Review the release names and resources before removal. Do not remove releases,
+Secrets, PVCs, or namespaces managed by other projects.
+
+### 2. Remove application releases
+
+The GnaX Config Server is installed as release `gnax-config-server` in `dev`:
+
+```bash
+helm uninstall gnax-config-server --namespace dev
+```
+
+For any other application releases, list each application namespace and
+uninstall only the releases belonging to this project. Replace
+`<release-name>` with the exact name shown by `helm list`:
+
+```bash
+helm list --namespace dev
+helm uninstall <release-name> --namespace dev
+helm list --namespace test
+helm uninstall <release-name> --namespace test
+helm list --namespace uat
+helm uninstall <release-name> --namespace uat
+```
+
+Helm removes the release-managed Deployments, Pods, Services, and other
+resources. Check for manually created resources separately.
+
+### 3. Remove the Config Server secret release
+
+After uninstalling the application release, remove the independent secret
+release from `dev`:
+
+```bash
+helm uninstall config-server --namespace dev
+```
+
+This removes the Kubernetes `config-server-secret`. Do not remove it while the
+Config Server is still in use; its credentials and Git URI are needed when the
+application starts.
+
+### 4. Remove infrastructure releases
+
+Each infrastructure component is an independent Helm release in each matching
+`*-infra` namespace. Check installed releases first:
+
+```bash
+helm list --namespace dev-infra
+helm list --namespace test-infra
+helm list --namespace uat-infra
+```
+
+Uninstall only releases that are installed and belong to this project:
+
+```bash
+helm uninstall mysql --namespace dev-infra
+helm uninstall mongodb --namespace dev-infra
+helm uninstall postgresql --namespace dev-infra
+helm uninstall kafka --namespace dev-infra
+
+helm uninstall mysql --namespace test-infra
+helm uninstall mongodb --namespace test-infra
+helm uninstall postgresql --namespace test-infra
+helm uninstall kafka --namespace test-infra
+
+helm uninstall mysql --namespace uat-infra
+helm uninstall mongodb --namespace uat-infra
+helm uninstall postgresql --namespace uat-infra
+helm uninstall kafka --namespace uat-infra
+```
+
+Skip any release that is not installed. These charts manage PVCs as part of
+their releases; Helm normally removes the PVC object on uninstall. Whether the
+underlying storage and data are reclaimed depends on the cluster's storage
+class and reclaim policy. Take and verify backups before uninstalling; inspect
+PVCs and persistent volumes before any manual storage cleanup.
+
+### 5. Remove namespaces only when empty and no longer needed
+
+First confirm there are no remaining workloads, Secrets, ConfigMaps, or PVCs
+and no resources from other projects in these namespaces. Deleting a namespace
+deletes all resources in it:
+
+```bash
+kubectl get all,secret,configmap,pvc -n dev
+kubectl get all,secret,configmap,pvc -n test
+kubectl get all,secret,configmap,pvc -n uat
+kubectl get all,secret,configmap,pvc -n dev-infra
+kubectl get all,secret,configmap,pvc -n test-infra
+kubectl get all,secret,configmap,pvc -n uat-infra
+```
+
+Only if these namespaces contain no unrelated resources, remove the namespace
+definitions:
+
+```bash
+kubectl delete -f namespaces/
+```
+
+### 6. Remove local secret override files (optional)
+
+Helm uninstall does not delete local files. Files matching `*.secret.yaml` are
+ignored by Git and remain on disk. Remove only the specific local secret files
+you no longer need, such as the MySQL, MongoDB, PostgreSQL, and Config Server
+secret overrides in `environments/<env>/`.
 
 For team or CI usage, use an encrypted secret workflow such as SOPS with age or a secret manager such as Vault or External Secrets. Do not treat base64-encoded Kubernetes Secret manifests as encryption.

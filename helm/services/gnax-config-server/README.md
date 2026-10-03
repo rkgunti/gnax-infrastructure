@@ -5,7 +5,8 @@ Helm chart for the GnaX Spring Cloud Config Server. Runs in the `dev` namespace;
 ## Prerequisites
 
 - Rancher Desktop Kubernetes is running and the local context is selected.
-- `config-server-secret` exists in `dev` (installed by `helm/infra/config-server`):
+- `config-server-secret` exists in `dev` (installed by
+  [`helm/services/config-server`](../config-server/README.md)):
 
 ```bash
 kubectl -n dev get secret config-server-secret
@@ -94,6 +95,13 @@ kubectl -n dev describe pod -l app.kubernetes.io/name=config-server
 
 ## Uninstall
 
+Uninstall the service release to remove the Config Server Deployment and
+Service. Its `config-server-secret` is a separate release and is not removed by
+this command:
+
 ```bash
 helm uninstall gnax-config-server -n dev
 ```
+
+When the secret is no longer needed, uninstall its release separately using
+the instructions in [`helm/services/config-server/README.md`](../config-server/README.md).
