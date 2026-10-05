@@ -1,0 +1,31 @@
+# Kubernetes resource name; the Service is reachable as <name>.<namespace>.svc.cluster.local
+name: gnax-api-gateway
+
+replicaCount: 2
+
+image:
+  repository: gnax-api-gateway
+  tag: "0.0.1-SNAPSHOT"
+  pullPolicy: IfNotPresent
+
+gateway:
+  secretName: gnax-api-gateway-secret
+  configServerUrl: "http://gnax-config-server.dev.svc.cluster.local:8888"
+
+service:
+  type: ClusterIP
+  port: 8080
+  # Only used when type is NodePort (host access from browser/IDE)
+  nodePort: null
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 768Mi
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 5
