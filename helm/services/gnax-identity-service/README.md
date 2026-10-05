@@ -11,32 +11,12 @@ The current local install uses namespace `dev`, release and resource name
 
 ## Prepare credentials and keys
 
-Create the ignored secret values file and fill in the database and Config
-Server credentials:
+Create the ignored secret values file and fill in the Config Server
+username and password:
 
 ```bash
 cp values/services/gnax-identity-service/secret.yaml.example \
   values/services/gnax-identity-service/secret.yaml
-```
-
-Never place JWT PEM contents or file paths in that YAML file. Store the
-private/public PEM files under the git-ignored
-`secrets/services/gnax-identity-service/` directory and supply the files to
-Helm using `--set-file`. Helm puts their contents in the Kubernetes Secret as
-`JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY`; the application receives the contents
-through those environment variables.
-
-Generate a key pair if needed:
-
-```bash
-mkdir -p secrets/services/gnax-identity-service
-openssl genpkey -algorithm RSA \
-  -out secrets/services/gnax-identity-service/private_key.pem \
-  -pkeyopt rsa_keygen_bits:2048
-openssl rsa \
-  -pubout \
-  -in secrets/services/gnax-identity-service/private_key.pem \
-  -out secrets/services/gnax-identity-service/public_key.pem
 ```
 
 The chart sets `SPRING_APPLICATION_NAME` to `gnax-identity-service` and
@@ -60,26 +40,20 @@ For Rancher Desktop's containerd runtime, use
 
 ## Validate and install
 
-Lint, render, or install using the same values and PEM files:
+Lint, render, or install using the same values files:
 
 ```bash
 helm lint ./helm/services/gnax-identity-service \
   --values values/services/gnax-identity-service/values.yaml \
-  --values values/services/gnax-identity-service/secret.yaml \
-  --set-file identity.jwtPrivateKey=secrets/services/gnax-identity-service/private_key.pem \
-  --set-file identity.jwtPublicKey=secrets/services/gnax-identity-service/public_key.pem
+  --values values/services/gnax-identity-service/secret.yaml
 helm template gnax-identity-service ./helm/services/gnax-identity-service \
   --namespace dev \
   --values values/services/gnax-identity-service/values.yaml \
-  --values values/services/gnax-identity-service/secret.yaml \
-  --set-file identity.jwtPrivateKey=secrets/services/gnax-identity-service/private_key.pem \
-  --set-file identity.jwtPublicKey=secrets/services/gnax-identity-service/public_key.pem
+  --values values/services/gnax-identity-service/secret.yaml
 helm upgrade --install gnax-identity-service ./helm/services/gnax-identity-service \
   --namespace dev --create-namespace \
   --values values/services/gnax-identity-service/values.yaml \
-  --values values/services/gnax-identity-service/secret.yaml \
-  --set-file identity.jwtPrivateKey=secrets/services/gnax-identity-service/private_key.pem \
-  --set-file identity.jwtPublicKey=secrets/services/gnax-identity-service/public_key.pem
+  --values values/services/gnax-identity-service/secret.yaml
 kubectl -n dev rollout status deployment/gnax-identity-service
 kubectl -n dev get pods,svc -l app.kubernetes.io/name=gnax-identity-service
 ```
@@ -115,6 +89,6 @@ kubectl -n dev get pods,svc,secret -l app.kubernetes.io/name=gnax-identity-servi
 helm uninstall gnax-identity-service --namespace dev
 ```
 
-Uninstalling removes the release-managed Secret, Deployment, and Service. Local
-secret values and PEM files are not removed automatically. Do not delete the
+Uninstalling removes the release-managed Secret, Deployment, and Service. The local
+secret values file is not removed automatically. Do not delete the
 namespace to remove this service if other releases use it.

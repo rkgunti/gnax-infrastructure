@@ -84,22 +84,6 @@ cp values/services/gnax-identity-service/secret.yaml.example values/services/gna
 Replace every `CHANGE_ME_*` value with local credentials. Never commit the
 resulting `.secret.yaml` files.
 
-The identity service JWT key pair is passed as files, not pasted into a values
-file. Keep the PEM files in the ignored
-`secrets/services/gnax-identity-service/` directory and pass them to Helm with
-`--set-file`. Generate a local key pair if needed:
-
-```bash
-mkdir -p secrets/services/gnax-identity-service
-openssl genpkey -algorithm RSA \
-  -out secrets/services/gnax-identity-service/private_key.pem \
-  -pkeyopt rsa_keygen_bits:2048
-openssl rsa \
-  -pubout \
-  -in secrets/services/gnax-identity-service/private_key.pem \
-  -out secrets/services/gnax-identity-service/public_key.pem
-```
-
 ## Validate charts
 
 Lint the charts with the local secret overrides:
@@ -120,9 +104,7 @@ helm lint ./helm/services/gnax-config-server \
   --values values/services/gnax-config-server/secret.yaml
 helm lint ./helm/services/gnax-identity-service \
   --values values/services/gnax-identity-service/values.yaml \
-  --values values/services/gnax-identity-service/secret.yaml \
-  --set-file identity.jwtPrivateKey=secrets/services/gnax-identity-service/private_key.pem \
-  --set-file identity.jwtPublicKey=secrets/services/gnax-identity-service/public_key.pem
+  --values values/services/gnax-identity-service/secret.yaml
 ```
 
 To render a chart before installing, use `helm template` with the same values.
@@ -167,9 +149,7 @@ helm upgrade --install gnax-config-server ./helm/services/gnax-config-server \
 helm upgrade --install gnax-identity-service ./helm/services/gnax-identity-service \
   --namespace dev \
   --values values/services/gnax-identity-service/values.yaml \
-  --values values/services/gnax-identity-service/secret.yaml \
-  --set-file identity.jwtPrivateKey=secrets/services/gnax-identity-service/private_key.pem \
-  --set-file identity.jwtPublicKey=secrets/services/gnax-identity-service/public_key.pem
+  --values values/services/gnax-identity-service/secret.yaml
 ```
 
 Check rollout and resources:

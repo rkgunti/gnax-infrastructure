@@ -19,8 +19,7 @@ Service-specific setup, deployment, and uninstall instructions are in each
 service chart's `README.md`. Current chart documentation:
 
 - [GnaX Config Server](./gnax-config-server/README.md), including its Secret
-- [GnaX Identity Service](./gnax-identity-service/README.md), including
-  file-based JWT Secret inputs
+- [GnaX Identity Service](./gnax-identity-service/README.md)
 
 Uninstall a service with `helm uninstall <release-name> --namespace dev` after
 checking the exact release name with `helm list --namespace dev`.
