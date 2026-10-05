@@ -10,8 +10,7 @@ image:
 
 identity:
   secretName: gnax-identity-service-secret
-  # Spring Config import URI (including the configserver: prefix) as seen from inside the cluster
-  configServerUrl: "configserver:http://gnax-config-server.dev.svc.cluster.local:8888"
+  configServerUrl: "http://gnax-config-server.dev.svc.cluster.local:8888"
 
 service:
   type: ClusterIP

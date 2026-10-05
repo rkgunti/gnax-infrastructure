@@ -21,7 +21,7 @@ cp values/services/gnax-identity-service/secret.yaml.example \
 
 The chart sets `SPRING_APPLICATION_NAME` to `gnax-identity-service` and
 provides `CONFIG_SERVER_URL` from the shared values file. Use
-`${CONFIG_SERVER_URL:configserver:http://localhost:30888}` for
+`configserver:${CONFIG_SERVER_URL}` for
 `spring.config.import` in the application. The default URL is the Config
 Server's in-cluster address for the current `dev` namespace.
 
@@ -31,8 +31,7 @@ From the infrastructure repository root, build the service image (adjust the
 sibling source path if needed):
 
 ```bash
-docker build --build-arg APP_PORT=8080 \
-  -t gnax-identity-service:0.0.1-SNAPSHOT ../gnax-identity-service
+docker build --build-arg APP_PORT=8080 -t gnax-identity-service:0.0.1-SNAPSHOT ../gnax-identity-service
 ```
 
 For Rancher Desktop's containerd runtime, use
