@@ -1,5 +1,5 @@
 # Kubernetes resource name; the Service is reachable as <name>.<namespace>.svc.cluster.local
-name: config-server
+name: gnax-config-server
 
 replicaCount: 1
 
@@ -9,7 +9,7 @@ image:
   pullPolicy: IfNotPresent
 
 configServer:
-  secretName: config-server-secret
+  secretName: gnax-config-server-secret
 
 service:
   type: ClusterIP

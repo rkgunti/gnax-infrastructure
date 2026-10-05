@@ -19,3 +19,5 @@ helm/*/Chart.lock
 # Temporary files
 *.tmp
 *.log
+# Per-service local secrets
+values/services/*/secret.yaml

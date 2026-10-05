@@ -5,13 +5,10 @@ Helm release in a local infrastructure namespace. It is intended for
 Rancher Desktop development and testing, not production use. The local broker
 uses plaintext listeners and has no authentication.
 
-## Per-environment settings
+## Current local settings
 
-| Environment | Namespace | Host NodePort |
-| --- | --- | --- |
-| dev | `dev-infra` | `30094` |
-| test | `test-infra` | `30094` |
-| uat | `uat-infra` | `30094` |
+The release uses namespace `dev-infra` and host NodePort `30094`. Its settings
+are in `values/infra/kafka.yaml`.
 
 In-cluster clients use port `9092`; the chart also configures the host listener
 on port `9094`. The Service and Deployment are named `kafka`; the chart creates
@@ -19,17 +16,13 @@ an `8Gi` PVC named `kafka-pvc`.
 
 ## Install or update
 
-Ensure the environment namespaces have been created with `kubectl apply -f namespaces/`.
-For dev:
+Ensure namespace `dev-infra` exists, then install or update the release:
 
 ```bash
 helm upgrade --install kafka ./helm/infra/kafka \
   --namespace dev-infra \
-  --values environments/dev/kafka.yaml
+  --values values/infra/kafka.yaml
 ```
-
-For test or uat, use the matching environment name in the namespace and values
-file. Each environment is a separate release in its own namespace.
 
 Validate the chart and check the workload:
 
@@ -42,9 +35,8 @@ kubectl logs deployment/kafka -n dev-infra
 
 ## Connect
 
-In-cluster clients use `kafka.<env>-infra.svc.cluster.local:9092`, for example
-`kafka.dev-infra.svc.cluster.local:9092`. Host-side clients use
-`localhost:30094`. The advertised host listener uses `localhost`, so external
+In-cluster clients use `kafka.dev-infra.svc.cluster.local:9092`. Host-side
+clients use `localhost:30094`. The advertised host listener uses `localhost`, so external
 clients should run on the same host as Rancher Desktop.
 
 ## Uninstall
@@ -64,5 +56,3 @@ reclaim policy.
 ```bash
 helm uninstall kafka --namespace dev-infra
 ```
-
-For test or uat, use the corresponding `test-infra` or `uat-infra` namespace.

@@ -23,6 +23,11 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
+          env:
+            - name: SERVER_PORT
+              value: {{ .Values.service.port | quote }}
+            - name: XDG_CONFIG_HOME
+              value: /tmp/.config
           envFrom:
             - secretRef:
                 name: {{ .Values.configServer.secretName }}
