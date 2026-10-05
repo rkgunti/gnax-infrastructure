@@ -1,0 +1,32 @@
+# Kubernetes resource name; the Service is reachable as <name>.<namespace>.svc.cluster.local
+name: gnax-identity-service
+
+replicaCount: 1
+
+image:
+  repository: gnax-identity-service
+  tag: "0.0.1-SNAPSHOT"
+  pullPolicy: IfNotPresent
+
+identity:
+  secretName: gnax-identity-service-secret
+  # Spring Config import URI as seen from inside the cluster
+  configServerUrl: "configserver:http://config-server.dev.svc.cluster.local:8888"
+
+service:
+  type: ClusterIP
+  port: 8080
+  # Only used when type is NodePort (host access from browser/IDE)
+  nodePort: null
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 768Mi
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 5

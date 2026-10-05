@@ -29,8 +29,12 @@ Run from the infrastructure repository root, adjusting the sibling source
 directory if it is located elsewhere:
 
 ```bash
-docker build -t gnax-config-server:0.0.1-SNAPSHOT ../gnax-config-server
+docker build --build-arg APP_PORT=8080 -t gnax-config-server:0.0.1-SNAPSHOT ../gnax-config-server
 ```
+
+The Dockerfile is generic (copies `target/*.jar`), so the same file and command
+pattern work for every service; change only the image name, source directory,
+and `APP_PORT`.
 
 With the Rancher Desktop containerd runtime, use
 `nerdctl --namespace k8s.io build` instead.

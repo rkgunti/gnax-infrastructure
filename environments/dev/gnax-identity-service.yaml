@@ -1,0 +1,10 @@
+image:
+  tag: "0.0.1-SNAPSHOT"
+
+identity:
+  secretName: gnax-identity-service-secret
+  configServerUrl: "configserver:http://config-server.dev.svc.cluster.local:8888"
+
+service:
+  type: NodePort
+  nodePort: 30081

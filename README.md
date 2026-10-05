@@ -260,8 +260,10 @@ cp environments/dev/gnax-config-server.secret.yaml.example environments/dev/gnax
 2. Build the image so the local cluster can use it (Rancher Desktop with dockerd; for containerd use `nerdctl --namespace k8s.io build`):
 
 ```bash
-docker build -t gnax-config-server:0.0.1-SNAPSHOT ../gnax-config-server
+docker build --build-arg APP_PORT=8080 -t gnax-config-server:0.0.1-SNAPSHOT ../gnax-config-server
 ```
+
+The same multi-stage Dockerfile (JDK 17 build stage, non-root runtime, `COPY --from=build /workspace/target/*.jar /app/app.jar`) works for every service; only the image name, source directory, and `APP_PORT` change.
 
 3. Validate the chart and render the service resources, including its Secret:
 
